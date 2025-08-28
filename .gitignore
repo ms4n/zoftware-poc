@@ -23,3 +23,7 @@ client/dist/
 
 
 .cursor
+
+
+proxies_formatted.csv
+proxies.csv

@@ -1,7 +1,7 @@
 # Scraping dependencies
 scrapy
-playwright
-scrapy-playwright
+undetected-chromedriver
+selenium
 
 # Data handling
 pydantic

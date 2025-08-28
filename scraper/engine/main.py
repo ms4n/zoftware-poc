@@ -1,9 +1,10 @@
-import argparse
-from scrapy.crawler import CrawlerProcess
-from scrapy.utils.project import get_project_settings
-from loguru import logger
-
 from scraper.sites.capterra import CapterraSpider
+from loguru import logger
+from scrapy.utils.project import get_project_settings
+from scrapy.crawler import CrawlerProcess
+import argparse
+
+
 # Import other spiders here as they are created
 # from scraper.sites.g2 import G2Spider
 
@@ -28,14 +29,6 @@ def run_spider(site_name: str):
         # Set up Scrapy settings
         settings = get_project_settings()
         settings.set("LOG_LEVEL", "WARNING")
-
-        # Add required settings for scrapy-playwright
-        settings.set("DOWNLOAD_HANDLERS", {
-            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
-            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
-        })
-        settings.set("TWISTED_REACTOR",
-                     "twisted.internet.asyncioreactor.AsyncioSelectorReactor")
 
         process = CrawlerProcess(settings)
         process.crawl(spider_class)

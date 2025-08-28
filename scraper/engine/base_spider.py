@@ -1,17 +1,24 @@
 import scrapy
-from scrapy_playwright.page import PageMethod
 from loguru import logger
+import time
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 
 class BaseSpider(scrapy.Spider):
     """
     Base spider for all site-specific spiders.
-    It provides common functionalities like Playwright integration and logging.
+    Provides common functionalities like Chrome driver management and logging.
     """
 
     def __init__(self, *args, **kwargs):
         super(BaseSpider, self).__init__(*args, **kwargs)
         self.setup_logging()
+        self.driver = None
+        self.wait = None
 
     def setup_logging(self):
         """Sets up Loguru logger."""
@@ -24,17 +31,65 @@ class BaseSpider(scrapy.Spider):
         )
         self.log = logger
 
-    async def start(self):
-        """
-        Must be implemented by subclasses to define the initial requests.
-        """
-        raise NotImplementedError
+    def init_driver(self, headless=False):
+        """Initialize undetected Chrome driver with configurable options"""
+        if not self.driver:
+            options = uc.ChromeOptions()
+            if headless:
+                options.add_argument('--headless')
+                options.add_argument('--no-sandbox')
+                options.add_argument('--disable-dev-shm-usage')
+                options.add_argument('--disable-gpu')
+                options.add_argument('--window-size=1920,1080')
 
-    def get_page_methods(self):
-        """
-        Returns a list of Playwright PageMethods to be used in requests.
-        This can be extended by subclasses if more complex interactions are needed.
-        """
-        return [
-            PageMethod("wait_for_load_state", "networkidle"),
-        ]
+            self.driver = uc.Chrome(options=options, use_subprocess=False)
+            self.wait = WebDriverWait(self.driver, 10)
+            self.log.info("Initialized undetected Chrome driver")
+
+    def navigate_to_page(self, url, wait_time=3):
+        """Navigate to a page and wait for it to load"""
+        self.driver.get(url)
+        time.sleep(wait_time)
+        return self.driver.title
+
+    def find_elements_safe(self, locator_type, locator_value, timeout=10):
+        """Safely find elements with timeout and error handling"""
+        try:
+            if locator_type == "xpath":
+                return self.wait.until(
+                    EC.presence_of_all_elements_located(
+                        (By.XPATH, locator_value))
+                )
+            elif locator_type == "class":
+                return self.wait.until(
+                    EC.presence_of_all_elements_located(
+                        (By.CLASS_NAME, locator_value))
+                )
+            elif locator_type == "id":
+                return self.wait.until(
+                    EC.presence_of_all_elements_located((By.ID, locator_value))
+                )
+        except TimeoutException:
+            return []
+
+    def extract_text_safe(self, element, xpath):
+        """Safely extract text from an element using xpath"""
+        try:
+            target_element = element.find_element(By.XPATH, xpath)
+            return target_element.text.strip()
+        except NoSuchElementException:
+            return ""
+
+    def extract_attribute_safe(self, element, xpath, attribute):
+        """Safely extract an attribute from an element using xpath"""
+        try:
+            target_element = element.find_element(By.XPATH, xpath)
+            return target_element.get_attribute(attribute)
+        except NoSuchElementException:
+            return ""
+
+    def closed(self, reason):
+        """Close the driver when spider is done"""
+        if self.driver:
+            self.driver.quit()
+            self.log.info("Closed undetected Chrome driver")
