@@ -1,0 +1,11 @@
+# Scraping dependencies
+scrapy
+playwright
+scrapy-playwright
+
+# Data handling
+pydantic
+
+# Utilities
+python-dotenv
+loguru
