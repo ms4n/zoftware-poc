@@ -20,6 +20,8 @@ class CapterraSpider(BaseSpider):
     MAX_PAGES = 1
     # Examples: 1 (quick test), 5 (moderate), 10+ (production)
 
+    USE_ROTATING_PROXIES = False  # Enable/disable rotating proxies
+
     # Capterra-specific selectors
     CATEGORY_LINKS_SELECTOR = "//div[@id='categories_list']/a"
     PRODUCT_CARD_CLASS = "product-card"
@@ -57,7 +59,7 @@ class CapterraSpider(BaseSpider):
                 self.log.warning("No category links found on the page.")
                 return
 
-            self.log.info(f"Found {len(category_links)} category links.")
+            self.log.success(f"Found {len(category_links)} category links.")
 
             # Apply category sampling based on configuration
             if self.SAMPLE_CATEGORY_COUNT == 0:
@@ -113,7 +115,7 @@ class CapterraSpider(BaseSpider):
                     f"No product listings found on {response.url}")
                 return
 
-            self.log.info(
+            self.log.success(
                 f"Found {len(product_cards)} product listings on page.")
 
             # Extract data from each product card
@@ -208,6 +210,6 @@ class CapterraSpider(BaseSpider):
             )
             return Request(next_page_url, callback=self.parse_category)
         else:
-            self.log.info(
+            self.log.success(
                 f"Finished scraping category '{category_name}'. Reached limit ({limit_info})."
             )

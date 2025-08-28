@@ -33,7 +33,7 @@ def run_spider(site_name: str):
         process = CrawlerProcess(settings)
         process.crawl(spider_class)
         process.start()
-        logger.info(f"Finished scraping {site_name}.")
+        logger.success(f"Successfully finished scraping {site_name}.")
 
     except Exception as e:
         logger.exception(f"An unexpected error occurred: {e}")

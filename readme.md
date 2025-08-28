@@ -54,3 +54,4 @@
 - ✅ Pagination across multiple pages
 - ✅ Complete data extraction pipeline
 - ✅ Confirmed headful mode requirement for production
+- ✅ Configurable proxy support for scale

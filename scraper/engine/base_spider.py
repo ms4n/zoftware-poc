@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from scraper.utils.proxy import ProxyManager
 
 
 class BaseSpider(scrapy.Spider):
@@ -19,6 +20,11 @@ class BaseSpider(scrapy.Spider):
         self.setup_logging()
         self.driver = None
         self.wait = None
+        self.proxy_manager = ProxyManager()
+
+        # Initialize proxies if USE_ROTATING_PROXIES is enabled
+        if getattr(self, 'USE_ROTATING_PROXIES', False):
+            self.proxy_manager.load_proxies()
 
     def setup_logging(self):
         """Sets up Loguru logger."""
@@ -31,16 +37,32 @@ class BaseSpider(scrapy.Spider):
         )
         self.log = logger
 
-    def init_driver(self, headless=False):
+    def get_random_proxy(self):
+        """Get a random proxy from the proxy manager"""
+        if hasattr(self, 'USE_ROTATING_PROXIES') and self.USE_ROTATING_PROXIES:
+            return self.proxy_manager.get_random_proxy()
+        return None
+
+    def init_driver(self, headless=False, use_proxy=True):
         """Initialize undetected Chrome driver with configurable options"""
         if not self.driver:
             options = uc.ChromeOptions()
+
             if headless:
                 options.add_argument('--headless')
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
                 options.add_argument('--disable-gpu')
                 options.add_argument('--window-size=1920,1080')
+
+            # Add proxy configuration if enabled and available
+            if use_proxy:
+                proxy = self.get_random_proxy()
+                if proxy:
+                    proxy_server = f"http://{proxy['host']}:{proxy['port']}"
+                    options.add_argument(f'--proxy-server={proxy_server}')
+                    self.log.info(
+                        f"Using proxy: {proxy['host']}:{proxy['port']}")
 
             self.driver = uc.Chrome(options=options, use_subprocess=False)
             self.wait = WebDriverWait(self.driver, 10)
