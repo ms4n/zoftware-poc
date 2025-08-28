@@ -1,1 +1,22 @@
 docs
+venv
+
+# Global
+.env
+*.log
+
+# Python (api, scraper)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node (client)
+client/node_modules/
+client/.next/
+client/dist/
+
+# OS / IDE junk
+.DS_Store
+.vscode/
+.idea/
