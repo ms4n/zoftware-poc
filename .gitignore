@@ -30,3 +30,7 @@ proxies.csv
 
 # Proxy extensions 
 scraper/utils/proxy_extensions/
+
+.env
+
+zoftware.db

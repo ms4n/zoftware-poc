@@ -285,6 +285,10 @@ class G2Spider(BaseSpider):
             self.log.success(
                 f"Found {len(product_cards)} product listings on page.")
 
+            # Collect all items first instead of yielding immediately
+            collected_items = []
+            scraped_count = 0
+
             for card in product_cards:
                 listing_data = self.extract_product_data(
                     card, category_slug, category_name, response.url,
@@ -293,8 +297,16 @@ class G2Spider(BaseSpider):
                     # Log concise info instead of full data
                     self.log.info(
                         f"Scraped: {listing_data.get('product_name', 'Unknown')} - {listing_data.get('category', {}).get('name', 'Unknown')}")
-                    # Yield the item for pipeline processing
-                    yield listing_data
+                    # Collect the item instead of yielding immediately
+                    collected_items.append(listing_data)
+                    scraped_count += 1
+
+            self.log.success(
+                f"Successfully scraped {scraped_count} products from {len(product_cards)} cards")
+
+            # Yield all collected items at once
+            for item in collected_items:
+                yield item
 
             # Handle pagination using URL-based approach
             next_request = self.handle_pagination(response, category_name)

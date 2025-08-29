@@ -38,6 +38,44 @@ async def ingest_product(
         )
 
 
+@router.post("/ingest/bulk", status_code=status.HTTP_202_ACCEPTED)
+async def bulk_ingest_products(
+    products: List[RawProduct],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest multiple raw products in bulk and process them with AI in the background
+    """
+    try:
+        product_controller = ProductController(db)
+        result = product_controller.bulk_ingest_products(products)
+
+        # Add bulk AI processing as background task for all created products
+        if "results" in result:
+            created_product_ids = [
+                product_result["raw_id"]
+                for product_result in result["results"]
+                if product_result["status"] == "created" and product_result["raw_id"]
+            ]
+
+            if created_product_ids:
+                # Process products in batches of 10 to respect rate limits
+                batch_size = 10
+                for i in range(0, len(created_product_ids), batch_size):
+                    batch_ids = created_product_ids[i:i + batch_size]
+                    background_tasks.add_task(
+                        product_controller.bulk_process_products_with_ai, batch_ids)
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to bulk ingest products: {str(e)}"
+        )
+
+
 @router.get("/")
 def get_products(
     status_filter: Optional[str] = None,

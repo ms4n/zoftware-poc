@@ -2,6 +2,7 @@ from urllib.parse import urljoin, urlparse, urlencode, parse_qs, urlunparse
 from scrapy import Request
 from scraper.engine.base_spider import BaseSpider
 import random
+import time
 
 
 class CapterraSpider(BaseSpider):
@@ -97,42 +98,52 @@ class CapterraSpider(BaseSpider):
 
             # Check for "Page not found" to stop pagination
             if self.find_elements_safe("xpath", self.PAGE_NOT_FOUND_XPATH):
-                self.log.warning(
-                    f"Page not found at {response.url}, stopping pagination for this category."
-                )
+                self.log.warning("Page not found, stopping pagination")
                 return
 
-            # Extract category information from URL
+            # Extract product cards
+            product_cards = self.find_elements_safe(
+                "class_name", self.PRODUCT_CARD_CLASS)
+
+            if not product_cards:
+                self.log.warning("No product cards found on the page.")
+                return
+
+            self.log.info(f"Found {len(product_cards)} product cards.")
+
+            # Extract category info from URL
             category_slug, category_name = self.extract_category_info(
                 response.url)
 
-            # Find product cards using base spider method
-            product_cards = self.find_elements_safe(
-                "class", self.PRODUCT_CARD_CLASS)
-
-            if not product_cards:
-                self.log.warning(
-                    f"No product listings found on {response.url}")
-                return
-
-            self.log.success(
-                f"Found {len(product_cards)} product listings on page.")
-
-            # Extract data from each product card
+            # Collect all items first instead of yielding immediately
+            collected_items = []
             scraped_count = 0
-            for card in product_cards:
-                listing_data = self.extract_product_data(
-                    card, category_slug, category_name, response.url)
-                if listing_data:
-                    scraped_count += 1
-                    # Log concise info instead of full data
-                    self.log.info(
-                        f"Scraped: {listing_data.get('product_name', 'Unknown')} - {listing_data.get('category', {}).get('name', 'Unknown')}")
-                    # Yield the item for pipeline processing
-                    yield listing_data
+
+            for i, card in enumerate(product_cards):
+                try:
+                    listing_data = self.extract_product_data(
+                        card, category_slug, category_name, response.url)
+                    if listing_data:
+                        scraped_count += 1
+                        # Log concise info instead of full data
+                        self.log.info(
+                            f"Scraped: {listing_data.get('product_name', 'Unknown')} - {listing_data.get('category', {}).get('name', 'Unknown')}")
+                        # Collect the item instead of yielding immediately
+                        collected_items.append(listing_data)
+                    else:
+                        self.log.warning(
+                            f"Failed to extract data from card {i+1}")
+
+                except Exception as e:
+                    self.log.warning(f"Error processing card {i+1}: {str(e)}")
+                    continue
 
             self.log.success(
                 f"Successfully scraped {scraped_count} products from {len(product_cards)} cards")
+
+            # Yield all collected items at once
+            for item in collected_items:
+                yield item
 
             # Handle pagination
             next_request = self.handle_pagination(response, category_name)

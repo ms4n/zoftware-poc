@@ -46,6 +46,72 @@ class ProductService:
             self.db.rollback()
             raise Exception(f"Failed to create product: {str(e)}")
 
+    def bulk_create_raw_products(self, products: List[RawProductModel]) -> Dict[str, Any]:
+        """Create multiple raw products in bulk"""
+        try:
+            results = []
+            created_count = 0
+            skipped_count = 0
+
+            for product in products:
+                # Check if product already exists
+                existing = self.db.query(RawProduct).filter(
+                    RawProduct.name == product.name).first()
+                if existing:
+                    results.append({
+                        "name": product.name,
+                        "status": "skipped",
+                        "message": "Product already exists",
+                        "raw_id": existing.id
+                    })
+                    skipped_count += 1
+                    continue
+
+                # Create raw product
+                db_product = RawProduct(
+                    name=product.name,
+                    description=product.description,
+                    website=product.website,
+                    logo=product.logo,
+                    category=product.category,
+                    processing_status="pending"
+                )
+                self.db.add(db_product)
+                results.append({
+                    "name": product.name,
+                    "status": "created",
+                    "message": "Product created successfully",
+                    "raw_id": None  # Will be set after commit
+                })
+                created_count += 1
+
+            # Commit all changes
+            self.db.commit()
+
+            # Update raw_id for created products
+            for i, result in enumerate(results):
+                if result["status"] == "created":
+                    # Get the product we just created to get its ID
+                    created_product = self.db.query(RawProduct).filter(
+                        RawProduct.name == result["name"]
+                    ).first()
+                    if created_product:
+                        result["raw_id"] = created_product.id
+
+            logger.info(
+                f"Bulk insert completed: {created_count} created, {skipped_count} skipped")
+            return {
+                "total_processed": len(products),
+                "created": created_count,
+                "skipped": skipped_count,
+                "results": results
+            }
+
+        except Exception as e:
+            logger.error(f"Error in bulk create: {e}")
+            self.db.rollback()
+            raise Exception(f"Failed to bulk create products: {str(e)}")
+
     def get_products(
         self,
         status_filter: Optional[str] = None,
@@ -129,6 +195,72 @@ class ProductService:
         except Exception as e:
             logger.error(f"Error creating clean product: {e}")
             self.db.rollback()
+            return False
+
+    def bulk_create_clean_products(self, ai_results: List[Dict[str, Any]]) -> bool:
+        """Create multiple clean products from AI processing results"""
+        try:
+            for result in ai_results:
+                raw_id = result.get("product_id")
+                if raw_id:
+                    clean_product = CleanProduct(
+                        raw_product_id=raw_id,
+                        description=result["description"],
+                        category=result["category"],
+                        status="pending"
+                    )
+                    self.db.add(clean_product)
+
+            self.db.commit()
+            logger.info(
+                f"Successfully created {len(ai_results)} clean products")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error creating clean products: {e}")
+            self.db.rollback()
+            return False
+
+    def bulk_process_products_with_ai(self, raw_ids: List[int]) -> bool:
+        """Process multiple raw products with AI in batches"""
+        try:
+            # Get raw products data
+            raw_products = self.db.query(RawProduct).filter(
+                RawProduct.id.in_(raw_ids)
+            ).all()
+
+            if not raw_products:
+                logger.warning("No raw products found for AI processing")
+                return False
+
+            # Update status to processing
+            for raw_product in raw_products:
+                raw_product.processing_status = "processing"
+
+            self.db.commit()
+
+            # Prepare data for AI processing
+            products_data = []
+            for raw_product in raw_products:
+                products_data.append({
+                    "id": raw_product.id,
+                    "name": raw_product.name,
+                    "website": raw_product.website,
+                    "category": raw_product.category,
+                    "description": raw_product.description
+                })
+
+            # Process with AI (this will be called from the controller)
+            logger.info(
+                f"Prepared {len(products_data)} products for AI processing")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error preparing products for AI processing: {e}")
+            # Reset status to pending on error
+            for raw_product in raw_products:
+                raw_product.processing_status = "pending"
+            self.db.commit()
             return False
 
     def get_stats(self) -> Dict[str, Any]:

@@ -2,21 +2,22 @@ import scrapy
 import requests
 import json
 from loguru import logger
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 class APIPipeline:
     """
-    Pipeline to post scraped data directly to FastAPI endpoint
+    Pipeline to collect scraped data and post to FastAPI endpoint in bulk
     """
 
     def __init__(self, api_url: str = "http://localhost:8000"):
         self.api_url = api_url
-        self.ingest_endpoint = f"{api_url}/ingest"
+        self.ingest_endpoint = f"{api_url}/products/ingest/bulk"
+        self.collected_items = []
 
     def process_item(self, item: Dict[str, Any], spider) -> Dict[str, Any]:
         """
-        Process scraped item by posting to API
+        Collect scraped item instead of posting immediately
         """
         try:
             # Prepare data for API using new simplified schema
@@ -28,36 +29,65 @@ class APIPipeline:
                 "category": item.get("category", {}).get("name", "")
             }
 
-            # Post to API
-            response = requests.post(
-                self.ingest_endpoint,
-                json=api_data,
-                headers={"Content-Type": "application/json"},
-                timeout=30
-            )
+            # Add to collection instead of posting immediately
+            self.collected_items.append(api_data)
 
-            if response.status_code == 202:
-                logger.success(
-                    f"Product posted to API: {item.get('product_name', 'Unknown')}")
-                item['api_status'] = 'accepted'
-            else:
-                logger.error(
-                    f"API request failed: {response.status_code} - {response.text}")
-                item['api_status'] = 'failed'
+            # Mark item as collected
+            item['api_status'] = 'collected'
+            logger.info(
+                f"Item collected: {item.get('product_name', 'Unknown')}")
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error posting to API: {e}")
-            item['api_status'] = 'network_error'
         except Exception as e:
-            logger.error(f"Unexpected error in API pipeline: {e}")
+            logger.error(f"Error collecting item: {e}")
             item['api_status'] = 'error'
 
         return item
 
+    def close_spider(self, spider):
+        """
+        Post all collected items to API when spider closes
+        """
+        if not self.collected_items:
+            logger.info("No items to post to API")
+            return
+
+        try:
+            logger.info(
+                f"Posting {len(self.collected_items)} items to API in bulk")
+
+            # Post all items in bulk
+            response = requests.post(
+                self.ingest_endpoint,
+                json=self.collected_items,
+                headers={"Content-Type": "application/json"},
+                timeout=60  # Increased timeout for bulk operations
+            )
+
+            if response.status_code == 202:
+                logger.success(
+                    f"Successfully posted {len(self.collected_items)} items to API")
+
+                # Log the response details
+                try:
+                    response_data = response.json()
+                    logger.info(
+                        f"API Response: {response_data.get('created', 0)} created, {response_data.get('skipped', 0)} skipped")
+                except:
+                    logger.info("API response received successfully")
+
+            else:
+                logger.error(
+                    f"Bulk API request failed: {response.status_code} - {response.text}")
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error posting to API: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in bulk API pipeline: {e}")
+
 
 class APIPipelineMiddleware:
     """
-    Scrapy middleware to automatically post items to API
+    Scrapy middleware to automatically collect items for bulk API posting
     """
 
     def __init__(self, api_url: str = "http://localhost:8000"):

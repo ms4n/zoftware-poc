@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
+from loguru import logger
 
 from database import RawProduct, CleanProduct, Review as ReviewModel
 from services.product_service import ProductService
@@ -21,6 +22,14 @@ class ProductController:
             return result
         except Exception as e:
             raise Exception(f"Failed to ingest product: {str(e)}")
+
+    def bulk_ingest_products(self, products: List[RawProductModel]) -> Dict[str, Any]:
+        """Ingest multiple raw products in bulk and return result"""
+        try:
+            result = self.product_service.bulk_create_raw_products(products)
+            return result
+        except Exception as e:
+            raise Exception(f"Failed to bulk ingest products: {str(e)}")
 
     def get_products(
         self,
@@ -120,4 +129,55 @@ class ProductController:
         except Exception as e:
             # Update status to failed
             self.product_service.update_processing_status(raw_id, "failed")
+            raise e
+
+    def bulk_process_products_with_ai(self, raw_ids: List[int]):
+        """Process multiple raw products with AI in batches"""
+        try:
+            if not raw_ids:
+                return
+
+            # Prepare products for AI processing
+            if not self.product_service.bulk_process_products_with_ai(raw_ids):
+                return
+
+            # Get raw products data for AI processing
+            raw_products = self.db.query(RawProduct).filter(
+                RawProduct.id.in_(raw_ids)
+            ).all()
+
+            # Prepare data for AI
+            products_data = []
+            for raw_product in raw_products:
+                products_data.append({
+                    "id": raw_product.id,
+                    "name": raw_product.name,
+                    "website": raw_product.website,
+                    "category": raw_product.category,
+                    "description": raw_product.description
+                })
+
+            # Process with AI in batch
+            ai_results = self.ai_service.process_multiple_products(
+                products_data)
+
+            # Save clean products
+            if self.product_service.bulk_create_clean_products(ai_results):
+                # Update raw product statuses to completed
+                for raw_id in raw_ids:
+                    self.product_service.update_processing_status(
+                        raw_id, "completed")
+                logger.info(
+                    f"Successfully processed {len(raw_ids)} products with AI")
+            else:
+                # Update statuses to failed
+                for raw_id in raw_ids:
+                    self.product_service.update_processing_status(
+                        raw_id, "failed")
+
+        except Exception as e:
+            # Update statuses to failed
+            for raw_id in raw_ids:
+                self.product_service.update_processing_status(raw_id, "failed")
+            logger.error(f"Bulk AI processing failed: {e}")
             raise e

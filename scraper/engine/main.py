@@ -1,12 +1,16 @@
+from scraper.sites.g2 import G2Spider
 from scraper.sites.capterra import CapterraSpider
 from loguru import logger
 from scrapy.utils.project import get_project_settings
 from scrapy.crawler import CrawlerProcess
 import argparse
+import os
+import sys
 
+# Add the scraper directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import other spiders here as they are created
-from scraper.sites.g2 import G2Spider
 
 # Spider registry
 SPIDERS = {
@@ -28,7 +32,20 @@ def run_spider(site_name: str):
     try:
         # Set up Scrapy settings
         settings = get_project_settings()
-        settings.set("LOG_LEVEL", "WARNING")
+
+        # Set the settings file path
+        settings.set('SETTINGS_MODULE', 'scraper.settings')
+
+        # Enable API pipeline
+        settings.set('ITEM_PIPELINES', {
+            'scraper.pipelines.api_pipeline.APIPipeline': 300,
+        })
+
+        # Set API URL
+        settings.set('API_URL', 'http://127.0.0.1:8000')
+
+        # Set log level
+        settings.set("LOG_LEVEL", "INFO")
 
         process = CrawlerProcess(settings)
         process.crawl(spider_class)
