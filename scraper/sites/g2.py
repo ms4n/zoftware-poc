@@ -2,22 +2,28 @@ from urllib.parse import urljoin, urlparse
 from scrapy import Request
 from scraper.engine.base_spider import BaseSpider
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
 import random
 import time
 import json
 
 
 class G2Spider(BaseSpider):
+    """
+    G2 Spider that follows this workflow:
+    1. Start from main categories page: /categories
+    2. Randomly sample SAMPLE_CATEGORY_COUNT categories
+    3. For each category: detect if it has subcategories or direct products
+    4. If subcategories: follow each subcategory link and scrape products
+    5. If direct products: scrape products immediately with pagination
+    """
     name = "g2"
     start_urls = [
-        "https://www.g2.com/categories/development-services"  # has subcategories
+        "https://www.g2.com/categories"  # Main categories page
     ]
     handle_httpstatus_list = [403, 404]
 
     # Number of random categories to sample (0 = all categories)
     SAMPLE_CATEGORY_COUNT = 2
-    # Examples: 1 (POC), 5 (testing), 0 (production - all categories)
 
     SCRAPE_ALL_PAGES = False   # If True, scrape all pages; if False, use MAX_PAGES
 
@@ -29,7 +35,7 @@ class G2Spider(BaseSpider):
     # G2-specific selectors for JS-rendered content
     CATEGORIES_TABLE_SELECTOR = "//table[@class='categories__table']"
     CATEGORY_ROW_SELECTOR = "//div[@class='categories__row']"
-    CATEGORY_LINK_SELECTOR = ".//div[@class='categories__name']//a[@class='link js-log-click']"
+    CATEGORY_LINK_SELECTOR = "//table[@class='categories__table']//a[contains(@href, '/categories/')]"
     PAGE_NOT_FOUND_XPATH = "//h1[contains(text(),'404')]"
 
     # Selectors for subcategory detection and extraction
@@ -61,16 +67,20 @@ class G2Spider(BaseSpider):
             title = self.navigate_to_page(response.url, wait_time=5)
             self.log.info(f"Page title: {title}")
 
-            # Detect page type (subcategories vs direct products)
-            page_type = self.detect_page_type()
-            self.log.info(f"Detected page type: {page_type}")
-
-            if page_type == "subcategories":
-                yield from self.handle_subcategories_page(response)
-            elif page_type == "direct_products":
-                yield from self.handle_direct_products_page(response)
+            # Check if this is the main categories page
+            if response.url == "https://www.g2.com/categories":
+                yield from self.handle_main_categories_page(response)
             else:
-                self.log.warning(f"Unknown page type for {response.url}")
+                # Detect page type (subcategories vs direct products)
+                page_type = self.detect_page_type()
+                self.log.info(f"Detected page type: {page_type}")
+
+                if page_type == "subcategories":
+                    yield from self.handle_subcategories_page(response)
+                elif page_type == "direct_products":
+                    yield from self.handle_direct_products_page(response)
+                else:
+                    self.log.warning(f"Unknown page type for {response.url}")
 
         except Exception as e:
             self.log.error(f"Error in parse method: {str(e)}")
@@ -95,6 +105,106 @@ class G2Spider(BaseSpider):
         # If no product cards found, treat as subcategory page
         self.log.info("No product cards found, treating as subcategory page")
         return "subcategories"
+
+    def handle_main_categories_page(self, response):
+        """
+        Handle the main categories page by extracting and randomly sampling category links.
+        """
+        self.log.info("Handling main categories page")
+
+        # Try multiple selectors to find category links
+        category_links = self.find_elements_safe(
+            "xpath", self.CATEGORY_LINK_SELECTOR)
+
+        if not category_links:
+            self.log.warning(
+                "Primary selector failed, trying alternative selectors...")
+            # Try alternative selectors
+            category_links = self.find_elements_safe(
+                "xpath", "//a[contains(@href, '/categories/')]")
+
+            if not category_links:
+                self.log.warning(
+                    "Alternative selector also failed, trying broader search...")
+                # Try even broader search
+                category_links = self.find_elements_safe(
+                    "xpath", "//a[contains(@href, '/categories/') and not(contains(@href, '?'))]")
+
+        if not category_links:
+            self.log.error(
+                "No category links found on main categories page with any selector")
+            # Log page structure for debugging
+            try:
+                page_text = self.driver.find_element(
+                    By.TAG_NAME, "body").text[:1000]
+                self.log.warning(f"Page content preview: {page_text}")
+            except:
+                pass
+            return
+
+        self.log.success(f"Found {len(category_links)} total category links")
+
+        # Randomly sample categories based on SAMPLE_CATEGORY_COUNT
+        if self.SAMPLE_CATEGORY_COUNT > 0:
+            # Randomly sample categories
+            import random
+            sampled_links = random.sample(category_links, min(
+                self.SAMPLE_CATEGORY_COUNT, len(category_links)))
+            self.log.info(
+                f"Randomly sampled {len(sampled_links)} categories from {len(category_links)} total")
+
+            # Log the randomly selected categories
+            for i, link in enumerate(sampled_links):
+                try:
+                    href = link.get_attribute("href")
+                    name = link.text.strip()
+                    display_name = name if name else href.split(
+                        '/')[-1].replace('-', ' ').title()
+                    self.log.info(
+                        f"Selected category {i+1}: {display_name} -> {href}")
+                except Exception as e:
+                    self.log.warning(
+                        f"Error examining selected link {i+1}: {str(e)}")
+        else:
+            # Use all categories
+            sampled_links = category_links
+            self.log.info(f"Using all {len(sampled_links)} categories")
+
+        # Process sampled category links
+        processed_count = 0
+        for link in sampled_links:
+            try:
+                href = link.get_attribute("href")
+                name = link.text.strip()
+
+                self.log.info(
+                    f"Processing category link: href={href}, name={name}")
+
+                if href:  # Only check if href exists, name can be empty
+                    full_url = urljoin(response.url, href)
+                    # Use name if available, otherwise extract from URL
+                    display_name = name if name else href.split(
+                        '/')[-1].replace('-', ' ').title()
+                    self.log.info(
+                        f"Following category: {display_name} -> {full_url}")
+                    yield Request(
+                        full_url,
+                        callback=self.parse,
+                        meta={'category_name': display_name},
+                        dont_filter=True
+                    )
+                    processed_count += 1
+                    self.log.info(
+                        f"Queued category {processed_count}/{len(sampled_links)}: {display_name}")
+                else:
+                    self.log.warning(
+                        f"Invalid category link: href={href}, name={name}")
+            except Exception as e:
+                self.log.warning(
+                    f"Error processing category link: {str(e)}")
+
+        self.log.success(
+            f"Successfully queued {processed_count} category requests")
 
     def handle_subcategories_page(self, response):
         """
