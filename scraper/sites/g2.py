@@ -11,8 +11,7 @@ import json
 class G2Spider(BaseSpider):
     name = "g2"
     start_urls = [
-        "https://www.g2.com/categories/video-conferencing"
-        # "https://www.g2.com/categories/development-services",  # subcategories - test later
+        "https://www.g2.com/categories/development-services"  # has subcategories
     ]
     handle_httpstatus_list = [403, 404]
 
@@ -23,7 +22,7 @@ class G2Spider(BaseSpider):
     SCRAPE_ALL_PAGES = False   # If True, scrape all pages; if False, use MAX_PAGES
 
     # Maximum number of pages to scrape per category (when SCRAPE_ALL_PAGES=False)
-    MAX_PAGES = 2
+    MAX_PAGES = 1
 
     USE_ROTATING_PROXIES = False  # Enable/disable rotating proxies
 
@@ -34,8 +33,8 @@ class G2Spider(BaseSpider):
     PAGE_NOT_FOUND_XPATH = "//h1[contains(text(),'404')]"
 
     # Selectors for subcategory detection and extraction
-    SUBCATEGORY_SECTION_SELECTOR = "//h2[contains(text(), 'Categories')] | //h1[contains(text(), 'Categories')] | //div[contains(@class, 'categories')]"
-    SUBCATEGORY_LINK_SELECTOR = "//a[contains(@href, '/categories/') and not(contains(@href, '?'))]"
+    SUBCATEGORY_SECTION_SELECTOR = "#ajax-container > div.paper.paper--nestable.mb-0.bg-offwhite-13"
+    SUBCATEGORY_LINK_SELECTOR = "//div[contains(@class, 'paper paper--box')]//a[contains(@href, '/categories/')]"
 
     # Selectors for direct product listings (updated to match actual G2 structure)
     PRODUCT_LISTING_SECTION_SELECTOR = "//div[contains(text(), 'Listings in')] | //div[contains(text(), 'listings')]"
@@ -62,9 +61,9 @@ class G2Spider(BaseSpider):
             title = self.navigate_to_page(response.url, wait_time=5)
             self.log.info(f"Page title: {title}")
 
-            page_type = "direct_products"
-            self.log.info(
-                f"Forcing page type to: {page_type} (for testing direct products)")
+            # Detect page type (subcategories vs direct products)
+            page_type = self.detect_page_type()
+            self.log.info(f"Detected page type: {page_type}")
 
             if page_type == "subcategories":
                 yield from self.handle_subcategories_page(response)
@@ -79,42 +78,23 @@ class G2Spider(BaseSpider):
     def detect_page_type(self):
         """
         Detect if the current page has subcategories or direct product listings.
+        Simplified boolean approach: if not direct products, treat as subcategories.
         """
         # Wait for page content to load
         time.sleep(2)
 
-        subcategory_elements = self.find_elements_safe(
-            "xpath", self.SUBCATEGORY_SECTION_SELECTOR, timeout=8)
-
-        # Check for subcategory links to confirm
-        subcategory_links = self.find_elements_safe(
-            "xpath", self.SUBCATEGORY_LINK_SELECTOR, timeout=5)
-
-        if subcategory_elements and subcategory_links:
-            self.log.info(
-                f"Found subcategories section with {len(subcategory_links)} subcategory links")
-            return "subcategories"
-
-        # Check for direct product listings
-        product_listing_elements = self.find_elements_safe(
-            "xpath", self.PRODUCT_LISTING_SECTION_SELECTOR, timeout=5)
-
-        # Check for product cards to confirm
+        # Check for direct product listings first
         product_cards = self.find_elements_safe(
-            "xpath", self.PRODUCT_CARD_SELECTOR, timeout=5)
+            "xpath", self.PRODUCT_CARD_SELECTOR, timeout=10)
 
-        if product_listing_elements or product_cards:
+        if product_cards:
             self.log.info(
                 f"Found direct product listings with {len(product_cards)} product cards")
             return "direct_products"
 
-        # Log page content for debugging if nothing found
-        self.log.warning(
-            "Could not determine page type. Logging page content...")
-        page_text = self.driver.find_element(By.TAG_NAME, "body").text[:500]
-        self.log.warning(f"Page content preview: {page_text}")
-
-        return "unknown"
+        # If no product cards found, treat as subcategory page
+        self.log.info("No product cards found, treating as subcategory page")
+        return "subcategories"
 
     def handle_subcategories_page(self, response):
         """
@@ -122,6 +102,7 @@ class G2Spider(BaseSpider):
         """
         self.log.info("Handling subcategories page")
 
+        # Use the driver that's already initialized in parse method
         subcategory_links = self.find_elements_safe(
             "xpath", self.SUBCATEGORY_LINK_SELECTOR)
 
@@ -132,10 +113,14 @@ class G2Spider(BaseSpider):
         self.log.success(f"Found {len(subcategory_links)} subcategory links")
 
         # Extract and follow subcategory links
+        processed_count = 0
         for link in subcategory_links:
             try:
                 href = link.get_attribute("href")
                 name = link.text.strip()
+
+                self.log.info(
+                    f"Processing subcategory link: href={href}, name={name}")
 
                 if href and name:
                     full_url = urljoin(response.url, href)
@@ -144,11 +129,21 @@ class G2Spider(BaseSpider):
                     yield Request(
                         full_url,
                         callback=self.parse_category,
-                        meta={'page_num': 1, 'category_name': name}
+                        meta={'page_num': 1, 'category_name': name},
+                        dont_filter=True  # Ensure all subcategories get processed
                     )
+                    processed_count += 1
+                    self.log.info(
+                        f"Queued subcategory {processed_count}/{len(subcategory_links)}: {name}")
+                else:
+                    self.log.warning(
+                        f"Invalid subcategory link: href={href}, name={name}")
             except Exception as e:
                 self.log.warning(
                     f"Error processing subcategory link: {str(e)}")
+
+        self.log.success(
+            f"Successfully queued {processed_count} subcategory requests")
 
     def handle_direct_products_page(self, response):
         """
@@ -241,6 +236,8 @@ class G2Spider(BaseSpider):
         # Assuming URL structure like /categories/crm
         category_slug = path.strip("/").split("/")[-1]
         category_name = category_slug.replace("-", " ").title()
+        self.log.info(
+            f"Extracted category info from {url}: slug={category_slug}, name={category_name}")
         return category_slug, category_name
 
     def extract_product_data(self, card, category_slug, category_name, base_url,
