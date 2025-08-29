@@ -6,12 +6,12 @@ import argparse
 
 
 # Import other spiders here as they are created
-# from scraper.sites.g2 import G2Spider
+from scraper.sites.g2 import G2Spider
 
 # Spider registry
 SPIDERS = {
     "capterra": CapterraSpider,
-    # "g2": G2Spider,
+    "g2": G2Spider,
 }
 
 
