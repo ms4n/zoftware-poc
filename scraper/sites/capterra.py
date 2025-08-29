@@ -119,10 +119,20 @@ class CapterraSpider(BaseSpider):
                 f"Found {len(product_cards)} product listings on page.")
 
             # Extract data from each product card
+            scraped_count = 0
             for card in product_cards:
                 listing_data = self.extract_product_data(
                     card, category_slug, category_name, response.url)
-                self.log.info(f"Scraped data: {listing_data}")
+                if listing_data:
+                    scraped_count += 1
+                    # Log concise info instead of full data
+                    self.log.info(
+                        f"Scraped: {listing_data.get('product_name', 'Unknown')} - {listing_data.get('category', {}).get('name', 'Unknown')}")
+                    # Yield the item for pipeline processing
+                    yield listing_data
+
+            self.log.success(
+                f"Successfully scraped {scraped_count} products from {len(product_cards)} cards")
 
             # Handle pagination
             next_request = self.handle_pagination(response, category_name)

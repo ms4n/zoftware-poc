@@ -290,8 +290,11 @@ class G2Spider(BaseSpider):
                     card, category_slug, category_name, response.url,
                     PRODUCT_NAME_SELECTOR, PRODUCT_LINK_SELECTOR, LOGO_SELECTOR, DESCRIPTION_SELECTOR)
                 if listing_data:
+                    # Log concise info instead of full data
                     self.log.info(
-                        f"Scraped product data:\n{json.dumps(listing_data, indent=2)}")
+                        f"Scraped: {listing_data.get('product_name', 'Unknown')} - {listing_data.get('category', {}).get('name', 'Unknown')}")
+                    # Yield the item for pipeline processing
+                    yield listing_data
 
             # Handle pagination using URL-based approach
             next_request = self.handle_pagination(response, category_name)
