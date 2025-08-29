@@ -28,13 +28,6 @@ class ProxyManager:
 
             logger.info(f"Loaded {len(proxies)} proxies for rotation.")
 
-            # Warn about authenticated proxies
-            if proxies and any(proxy.get('user') and proxy.get('pass') for proxy in proxies):
-                logger.warning(
-                    "Detected authenticated proxies. Chrome has limitations with proxy authentication via command line.")
-                logger.info(
-                    "For better proxy auth support, consider using proxy services without authentication or browser extensions.")
-
         except FileNotFoundError:
             logger.warning(
                 f"Proxy file not found at {self.proxy_file_path}. Scraping without proxies.")

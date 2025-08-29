@@ -55,14 +55,22 @@ class BaseSpider(scrapy.Spider):
                 options.add_argument('--disable-gpu')
                 options.add_argument('--window-size=1920,1080')
 
+            # Add anti-detection options
+            options.add_argument(
+                '--disable-blink-features=AutomationControlled')
+            options.add_argument('--disable-extensions-except')
+            options.add_argument('--disable-plugins-discovery')
+            options.add_argument('--disable-default-apps')
+
             # Add proxy configuration if enabled and available
             if use_proxy:
                 proxy = self.get_random_proxy()
                 if proxy:
+                    # Use simple proxy - Chrome will prompt for credentials
                     proxy_server = f"http://{proxy['host']}:{proxy['port']}"
                     options.add_argument(f'--proxy-server={proxy_server}')
                     self.log.info(
-                        f"Using proxy: {proxy['host']}:{proxy['port']}")
+                        f"Using proxy: {proxy['host']}:{proxy['port']} (Chrome will prompt for credentials)")
 
             self.driver = uc.Chrome(options=options, use_subprocess=False)
             self.wait = WebDriverWait(self.driver, 10)

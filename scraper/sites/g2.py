@@ -128,7 +128,6 @@ class G2Spider(BaseSpider):
         # Randomly sample categories based on SAMPLE_CATEGORY_COUNT
         if self.SAMPLE_CATEGORY_COUNT > 0:
             # Randomly sample categories
-            import random
             sampled_links = random.sample(category_links, min(
                 self.SAMPLE_CATEGORY_COUNT, len(category_links)))
             self.log.info(
