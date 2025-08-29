@@ -10,7 +10,7 @@ import json
 class G2Spider(BaseSpider):
     name = "g2"
     start_urls = [
-        "https://www.g2.com/categories"  # Main categories page
+        "https://www.g2.com/categories/threat-intelligence"  # Main categories page
     ]
     handle_httpstatus_list = [403, 404]
 
@@ -24,19 +24,19 @@ class G2Spider(BaseSpider):
 
     USE_ROTATING_PROXIES = True  # Enable/disable rotating proxies
 
-    # G2-specific selectors for JS-rendered content
-    CATEGORIES_TABLE_SELECTOR = "//table[@class='categories__table']"
-    CATEGORY_ROW_SELECTOR = "//div[@class='categories__row']"
-    CATEGORY_LINK_SELECTOR = "//table[@class='categories__table']//a[contains(@href, '/categories/')]"
+    # G2-specific selectors for JS-rendered content (updated for new UI)
+    CATEGORIES_TABLE_SELECTOR = "//div[contains(@class, 'categories__table')]"
+    CATEGORY_ROW_SELECTOR = "//div[contains(@class, 'categories__row')]"
+    CATEGORY_LINK_SELECTOR = "//a[contains(@href, '/categories/')]"
     PAGE_NOT_FOUND_XPATH = "//h1[contains(text(),'404')]"
 
     # Selectors for subcategory detection and extraction
-    SUBCATEGORY_SECTION_SELECTOR = "#ajax-container > div.paper.paper--nestable.mb-0.bg-offwhite-13"
-    SUBCATEGORY_LINK_SELECTOR = "//div[contains(@class, 'paper paper--box')]//a[contains(@href, '/categories/')]"
+    SUBCATEGORY_SECTION_SELECTOR = "//div[contains(@class, 'paper') and contains(@class, 'paper--nestable')]"
+    SUBCATEGORY_LINK_SELECTOR = "//div[contains(@class, 'paper')]//a[contains(@href, '/categories/')]"
 
-    # Selectors for direct product listings (updated to match actual G2 structure)
+    # Selectors for direct product listings (updated for new G2 UI)
     PRODUCT_LISTING_SECTION_SELECTOR = "//div[contains(text(), 'Listings in')] | //div[contains(text(), 'listings')]"
-    PRODUCT_CARD_SELECTOR = "//div[@class='segmented-shadow-card__segment segmented-shadow-card__segment--multi-part'] | //div[@class='product-card']"
+    PRODUCT_CARD_SELECTOR = "//div[contains(@class, 'segmented-shadow-card__segment')] | //div[contains(@class, 'product-card')]"
 
     async def start(self):
         for url in self.start_urls:
@@ -76,9 +76,9 @@ class G2Spider(BaseSpider):
         # Wait for page content to load
         time.sleep(2)
 
-        # Check for direct product listings first
+        # Check for direct product listings first - look for the specific product card structure
         product_cards = self.find_elements_safe(
-            "xpath", self.PRODUCT_CARD_SELECTOR, timeout=10)
+            "xpath", "//div[contains(@class, 'segmented-shadow-card__segment') and contains(@class, 'segmented-shadow-card__segment--multi-part')]", timeout=10)
 
         if product_cards:
             self.log.info(
@@ -250,12 +250,12 @@ class G2Spider(BaseSpider):
 
     def parse_category(self, response):
         # Parses a category page to extract software listings.
-        # selectors based on consistent G2 class patterns
-        PRODUCT_CARD_SELECTOR = "//div[contains(@class, 'segmented-shadow-card__segment')]"
+        # selectors based on new G2 UI structure
+        PRODUCT_CARD_SELECTOR = "//div[contains(@class, 'segmented-shadow-card__segment') and contains(@class, 'segmented-shadow-card__segment--multi-part')]"
 
-        PRODUCT_NAME_SELECTOR = ".//div[@itemprop='name']"
-        PRODUCT_LINK_SELECTOR = ".//a[.//div[@itemprop='name']]"
-        LOGO_SELECTOR = ".//img[@itemprop='image']"
+        PRODUCT_NAME_SELECTOR = ".//div[@itemprop='name'] | .//div[contains(@class, 'product-card__product-name')]//div"
+        PRODUCT_LINK_SELECTOR = ".//a[.//div[@itemprop='name']] | .//a[contains(@class, 'product-card__img')]"
+        LOGO_SELECTOR = ".//img[@itemprop='image'] | .//img[contains(@class, 'x-deferred-image-initialized')]"
         DESCRIPTION_SELECTOR = ".//span[contains(@class, 'product-listing__paragraph')]"
 
         self.init_driver(headless=False)
@@ -290,7 +290,8 @@ class G2Spider(BaseSpider):
             collected_items = []
             scraped_count = 0
 
-            for card in product_cards:
+            for i, card in enumerate(product_cards):
+                self.log.info(f"Processing card {i+1}/{len(product_cards)}")
                 listing_data = self.extract_product_data(
                     card, category_slug, category_name, response.url,
                     PRODUCT_NAME_SELECTOR, PRODUCT_LINK_SELECTOR, LOGO_SELECTOR, DESCRIPTION_SELECTOR)
@@ -301,12 +302,17 @@ class G2Spider(BaseSpider):
                     # Collect the item instead of yielding immediately
                     collected_items.append(listing_data)
                     scraped_count += 1
+                else:
+                    self.log.warning(f"Failed to extract data from card {i+1}")
 
             self.log.success(
                 f"Successfully scraped {scraped_count} products from {len(product_cards)} cards")
 
             # Yield all collected items at once
             for item in collected_items:
+                # Log each scraped product in JSON structure
+                # self.log.info(
+                #     f"Scraped product: {json.dumps(item, ensure_ascii=False)}")
                 yield item
 
             # Handle pagination using URL-based approach
@@ -371,78 +377,45 @@ class G2Spider(BaseSpider):
             return None
 
     def extract_full_description(self, card, description_selector):
-        # Extract complete product description using two-part structure
+        # Extract complete product description using simplified CSS selector approach
         try:
-            # Find description specifically within this card's scope
-            desc_element = None
-
-            # First try: look for description within the current card
-            try:
-                desc_element = card.find_element(
-                    By.XPATH, description_selector)
-            except:
-                # Second try: look for description in the immediate parent product-card
-                try:
-                    product_card = card.find_element(
-                        By.XPATH, ".//div[contains(@class, 'product-card')]")
-                    desc_element = product_card.find_element(
-                        By.XPATH, description_selector)
-                except:
-                    # Third try: look for any description span within this specific card's DOM tree
-                    try:
-                        desc_element = card.find_element(
-                            By.XPATH, ".//span[contains(@class, 'product-listing__paragraph')]")
-                    except:
-                        pass
+            # Find description element using CSS selector instead of XPath
+            desc_element = card.find_element(
+                By.CSS_SELECTOR, "span.product-listing__paragraph")
 
             if desc_element:
-                # Get the visible text (first part) - this is ALWAYS available
-                visible_text = desc_element.text.strip()
+                # Get small description (text inside span, excluding "Show More" link)
+                small_description = desc_element.get_attribute(
+                    "textContent").strip()
+                if "Show More" in small_description:
+                    small_description = small_description.split("Show More")[
+                        0].strip()
+                small_description = small_description.replace(
+                    "...", "").strip()
 
-                # Clean visible text by removing "Show More" and trailing dots
-                if "Show More" in visible_text:
-                    visible_text = visible_text.split("Show More")[0].strip()
-                visible_text = visible_text.replace("...", "").strip()
+                # Get extended description from data attribute
+                extended_description = desc_element.get_attribute(
+                    "data-truncate-revealer-overflow-text")
 
-                # Try to get overflow text (second part) from attribute
-                overflow_text = ""
-                try:
-                    overflow_text = desc_element.get_attribute(
-                        "data-truncate-revealer-overflow-text")
-                    if overflow_text:
-                        overflow_text = overflow_text.strip()
-                except:
-                    pass
-
-                # If we have both parts, combine them
-                if visible_text and overflow_text:
-                    complete_description = visible_text + " " + overflow_text
-                    return " ".join(complete_description.split())
-
-                # If we only have visible text (short descriptions), return it
-                elif visible_text:
-                    return " ".join(visible_text.split())
-
-                # Fallback: try to get hidden text from span (legacy method)
+                if extended_description and small_description:
+                    # Combine both parts
+                    full_description = small_description + " " + extended_description
+                    return " ".join(full_description.split())
+                elif small_description:
+                    # Only small description available
+                    return " ".join(small_description.split())
+                elif extended_description:
+                    # Only extended description available (rare case)
+                    return " ".join(extended_description.split())
                 else:
-                    try:
-                        hidden_span = desc_element.find_element(
-                            By.XPATH, ".//span[@class='hide-if-js']")
-                        hidden_text = hidden_span.text.strip()
-                        if hidden_text:
-                            # Combine visible + hidden span text
-                            full_description = visible_text + " " + hidden_text
-                            return " ".join(full_description.split())
-                    except:
-                        pass
-
-                # Final fallback: return visible text if nothing else works
-                return " ".join(visible_text.split()) if visible_text else ""
+                    return ""
 
             return ""
 
         except Exception as e:
-            self.log.warning(f"Error extracting description: {str(e)}")
+            # Extract just the error message without stack trace
+            error_msg = str(e).split('\n')[0] if '\n' in str(e) else str(e)
+            self.log.warning(f"Failed to extract description: {error_msg}")
             return ""
 
     def handle_pagination(self, response, category_name):
