@@ -11,7 +11,7 @@ import json
 class G2Spider(BaseSpider):
     name = "g2"
     start_urls = [
-        "https://www.g2.com/categories/last-mile-delivery"
+        "https://www.g2.com/categories/video-conferencing"
         # "https://www.g2.com/categories/development-services",  # subcategories - test later
     ]
     handle_httpstatus_list = [403, 404]
@@ -228,7 +228,7 @@ class G2Spider(BaseSpider):
                     self.log.info(
                         f"Scraped product data:\n{json.dumps(listing_data, indent=2)}")
 
-            # Handle pagination 
+            # Handle pagination
             next_request = self.handle_pagination(
                 response, category_name, PAGINATION_NEXT_SELECTOR)
             if next_request:
@@ -314,49 +314,48 @@ class G2Spider(BaseSpider):
                         pass
 
             if desc_element:
-                # Get the visible text (first part)
+                # Get the visible text (first part) - this is ALWAYS available
                 visible_text = desc_element.text.strip()
+
+                # Clean visible text by removing "Show More" and trailing dots
                 if "Show More" in visible_text:
                     visible_text = visible_text.split("Show More")[0].strip()
+                visible_text = visible_text.replace("...", "").strip()
 
-                # Get the full description by combining visible text + overflow text
+                # Try to get overflow text (second part) from attribute
+                overflow_text = ""
                 try:
                     overflow_text = desc_element.get_attribute(
                         "data-truncate-revealer-overflow-text")
-                    if overflow_text and overflow_text.strip():
-                        # Clean the visible text (remove "Show More" and trailing dots)
-                        clean_visible = visible_text.replace("...", "").strip()
-
-                        # Clean the overflow text (remove leading fragments that might overlap)
-                        clean_overflow = overflow_text.strip()
-
-                        # Combine visible + overflow for complete description
-                        complete_description = clean_visible + " " + clean_overflow
-                        return " ".join(complete_description.split())
-                    else:
-                        # Fallback: try to get hidden text from span
-                        try:
-                            hidden_span = desc_element.find_element(
-                                By.XPATH, ".//span[@class='hide-if-js']")
-                            hidden_text = hidden_span.text.strip()
-                            # Combine first part + second part
-                            full_description = visible_text + hidden_text
-                            return " ".join(full_description.split())
-                        except:
-                            # If no hidden span, just return the visible part
-                            return " ".join(visible_text.split())
+                    if overflow_text:
+                        overflow_text = overflow_text.strip()
                 except:
-                    # Fallback: try to get hidden text from span
+                    pass
+
+                # If we have both parts, combine them
+                if visible_text and overflow_text:
+                    complete_description = visible_text + " " + overflow_text
+                    return " ".join(complete_description.split())
+
+                # If we only have visible text (short descriptions), return it
+                elif visible_text:
+                    return " ".join(visible_text.split())
+
+                # Fallback: try to get hidden text from span (legacy method)
+                else:
                     try:
                         hidden_span = desc_element.find_element(
                             By.XPATH, ".//span[@class='hide-if-js']")
                         hidden_text = hidden_span.text.strip()
-                        # Combine first part + second part
-                        full_description = visible_text + hidden_text
-                        return " ".join(full_description.split())
+                        if hidden_text:
+                            # Combine visible + hidden span text
+                            full_description = visible_text + " " + hidden_text
+                            return " ".join(full_description.split())
                     except:
-                        # If no hidden span, just return the visible part
-                        return " ".join(visible_text.split())
+                        pass
+
+                # Final fallback: return visible text if nothing else works
+                return " ".join(visible_text.split()) if visible_text else ""
 
             return ""
 
