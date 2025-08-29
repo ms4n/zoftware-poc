@@ -15,14 +15,14 @@ class G2Spider(BaseSpider):
     handle_httpstatus_list = [403, 404]
 
     # Number of random categories to sample (0 = all categories)
-    SAMPLE_CATEGORY_COUNT = 2
+    SAMPLE_CATEGORY_COUNT = 1
 
     SCRAPE_ALL_PAGES = False   # If True, scrape all pages; if False, use MAX_PAGES
 
     # Maximum number of pages to scrape per category (when SCRAPE_ALL_PAGES=False)
     MAX_PAGES = 1
 
-    USE_ROTATING_PROXIES = False  # Enable/disable rotating proxies
+    USE_ROTATING_PROXIES = True  # Enable/disable rotating proxies
 
     # G2-specific selectors for JS-rendered content
     CATEGORIES_TABLE_SELECTOR = "//table[@class='categories__table']"
@@ -125,13 +125,14 @@ class G2Spider(BaseSpider):
 
         self.log.success(f"Found {len(category_links)} total category links")
 
-        # Randomly sample categories based on SAMPLE_CATEGORY_COUNT
+        # Select from top 10 categories instead of random sampling
         if self.SAMPLE_CATEGORY_COUNT > 0:
-            # Randomly sample categories
-            sampled_links = random.sample(category_links, min(
-                self.SAMPLE_CATEGORY_COUNT, len(category_links)))
+            # Take top 10 categories and then sample from those
+            top_10_links = category_links[:10]
+            sampled_links = random.sample(top_10_links, min(
+                self.SAMPLE_CATEGORY_COUNT, len(top_10_links)))
             self.log.info(
-                f"Randomly sampled {len(sampled_links)} categories from {len(category_links)} total")
+                f"Randomly sampled {len(sampled_links)} categories from top 10 categories")
 
             # Log the randomly selected categories
             for i, link in enumerate(sampled_links):
@@ -255,7 +256,7 @@ class G2Spider(BaseSpider):
         PRODUCT_NAME_SELECTOR = ".//div[@itemprop='name']"
         PRODUCT_LINK_SELECTOR = ".//a[.//div[@itemprop='name']]"
         LOGO_SELECTOR = ".//img[@itemprop='image']"
-        DESCRIPTION_SELECTOR = ".//span[contains(@class, 'product-listing__paragraph') and contains(@class, 'x-truncate-revealer-initialized')]"
+        DESCRIPTION_SELECTOR = ".//span[contains(@class, 'product-listing__paragraph')]"
 
         self.init_driver(headless=False)
         try:

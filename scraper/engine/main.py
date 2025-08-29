@@ -6,6 +6,7 @@ from scrapy.crawler import CrawlerProcess
 import argparse
 import os
 import sys
+import logging
 
 # Add the scraper directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,8 +45,17 @@ def run_spider(site_name: str):
         # Set API URL
         settings.set('API_URL', 'http://127.0.0.1:8000')
 
-        # Set log level
-        settings.set("LOG_LEVEL", "INFO")
+        # Suppress Scrapy's verbose logging - only show errors
+        settings.set("LOG_LEVEL", "ERROR")
+
+        # Disable Scrapy's built-in logging
+        settings.set("LOG_ENABLED", False)
+
+        # Disable specific Scrapy extensions that generate noise
+        settings.set("TELNETCONSOLE_ENABLED", False)
+        settings.set("LOGSTATS_INTERVAL", 0)
+        settings.set("MEMUSAGE_ENABLED", False)
+        settings.set("MEMUSAGE_LIMIT_MB", 0)
 
         process = CrawlerProcess(settings)
         process.crawl(spider_class)

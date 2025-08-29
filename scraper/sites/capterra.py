@@ -11,7 +11,7 @@ class CapterraSpider(BaseSpider):
     handle_httpstatus_list = [403, 404]
 
     # Number of random categories to sample (0 = all categories)
-    SAMPLE_CATEGORY_COUNT = 2
+    SAMPLE_CATEGORY_COUNT = 1
     # Examples: 1 (POC), 5 (testing), 0 (production - all categories)
 
     SCRAPE_ALL_PAGES = False   # If True, scrape all pages; if False, use MAX_PAGES
@@ -67,13 +67,14 @@ class CapterraSpider(BaseSpider):
                 # Scrape all categories
                 sample_links = category_links
             else:
-                # Sample specified number of categories
+                # Sample specified number of categories from top 10 only
+                top_10_links = category_links[:10]
                 sample_count = min(
-                    self.SAMPLE_CATEGORY_COUNT, len(category_links))
-                sample_links = random.sample(category_links, sample_count)
+                    self.SAMPLE_CATEGORY_COUNT, len(top_10_links))
+                sample_links = random.sample(top_10_links, sample_count)
 
             self.log.info(
-                f"Processing {len(sample_links)} category links (configured: {self.SAMPLE_CATEGORY_COUNT}).")
+                f"Processing {len(sample_links)} category links from top 10 (configured: {self.SAMPLE_CATEGORY_COUNT}).")
 
             for link_element in sample_links:
                 href = link_element.get_attribute("href")
@@ -103,7 +104,7 @@ class CapterraSpider(BaseSpider):
 
             # Extract product cards
             product_cards = self.find_elements_safe(
-                "class_name", self.PRODUCT_CARD_CLASS)
+                "class", self.PRODUCT_CARD_CLASS)
 
             if not product_cards:
                 self.log.warning("No product cards found on the page.")

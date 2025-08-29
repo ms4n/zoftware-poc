@@ -39,8 +39,9 @@ HTTPCACHE_DIR = 'httpcache'
 HTTPCACHE_IGNORE_HTTP_CODES = []
 HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-# Logging
-LOG_LEVEL = 'INFO'
+# Logging - suppress Scrapy's verbose output
+LOG_LEVEL = 'ERROR'
+LOG_ENABLED = False
 LOG_FORMAT = '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
 
 # Disable cookies (enabled by default)
@@ -48,6 +49,11 @@ COOKIES_ENABLED = False
 
 # Disable Telnet Console (enabled by default)
 TELNETCONSOLE_ENABLED = False
+
+# Disable other noisy extensions
+LOGSTATS_INTERVAL = 0
+MEMUSAGE_ENABLED = False
+MEMUSAGE_LIMIT_MB = 0
 
 # Override the default request headers
 DEFAULT_REQUEST_HEADERS = {

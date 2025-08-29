@@ -250,13 +250,35 @@ class ProductService:
                     "description": raw_product.description
                 })
 
-            # Process with AI (this will be called from the controller)
-            logger.info(
-                f"Prepared {len(products_data)} products for AI processing")
-            return True
+            # Import AI service here to avoid circular imports
+            from services.ai_service import AIService
+            ai_service = AIService()
+
+            # Process with AI
+            ai_results = ai_service.process_multiple_products(products_data)
+
+            if ai_results:
+                # Create clean products from AI results
+                if self.bulk_create_clean_products(ai_results):
+                    # Update raw product statuses to completed
+                    for raw_id in raw_ids:
+                        self.update_processing_status(raw_id, "completed")
+                    logger.info(
+                        f"Successfully processed {len(raw_ids)} products with AI")
+                    return True
+                else:
+                    # Update statuses to failed if clean product creation fails
+                    for raw_id in raw_ids:
+                        self.update_processing_status(raw_id, "failed")
+                    return False
+            else:
+                # Update statuses to failed if AI processing fails
+                for raw_id in raw_ids:
+                    self.update_processing_status(raw_id, "failed")
+                return False
 
         except Exception as e:
-            logger.error(f"Error preparing products for AI processing: {e}")
+            logger.error(f"Error processing products with AI: {e}")
             # Reset status to pending on error
             for raw_product in raw_products:
                 raw_product.processing_status = "pending"

@@ -137,47 +137,17 @@ class ProductController:
             if not raw_ids:
                 return
 
-            # Prepare products for AI processing
-            if not self.product_service.bulk_process_products_with_ai(raw_ids):
-                return
-
-            # Get raw products data for AI processing
-            raw_products = self.db.query(RawProduct).filter(
-                RawProduct.id.in_(raw_ids)
-            ).all()
-
-            # Prepare data for AI
-            products_data = []
-            for raw_product in raw_products:
-                products_data.append({
-                    "id": raw_product.id,
-                    "name": raw_product.name,
-                    "website": raw_product.website,
-                    "category": raw_product.category,
-                    "description": raw_product.description
-                })
-
-            # Process with AI in batch
-            ai_results = self.ai_service.process_multiple_products(
-                products_data)
-
-            # Save clean products
-            if self.product_service.bulk_create_clean_products(ai_results):
-                # Update raw product statuses to completed
-                for raw_id in raw_ids:
-                    self.product_service.update_processing_status(
-                        raw_id, "completed")
+            # Process products with AI through the service
+            if self.product_service.bulk_process_products_with_ai(raw_ids):
                 logger.info(
                     f"Successfully processed {len(raw_ids)} products with AI")
             else:
-                # Update statuses to failed
-                for raw_id in raw_ids:
-                    self.product_service.update_processing_status(
-                        raw_id, "failed")
+                logger.error(
+                    f"Failed to process {len(raw_ids)} products with AI")
 
         except Exception as e:
+            logger.error(f"Bulk AI processing failed: {e}")
             # Update statuses to failed
             for raw_id in raw_ids:
                 self.product_service.update_processing_status(raw_id, "failed")
-            logger.error(f"Bulk AI processing failed: {e}")
             raise e
