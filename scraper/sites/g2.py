@@ -23,7 +23,7 @@ class G2Spider(BaseSpider):
     SCRAPE_ALL_PAGES = False   # If True, scrape all pages; if False, use MAX_PAGES
 
     # Maximum number of pages to scrape per category (when SCRAPE_ALL_PAGES=False)
-    MAX_PAGES = 1
+    MAX_PAGES = 2
 
     USE_ROTATING_PROXIES = False  # Enable/disable rotating proxies
 
@@ -177,7 +177,6 @@ class G2Spider(BaseSpider):
         PRODUCT_LINK_SELECTOR = ".//a[.//div[@itemprop='name']]"
         LOGO_SELECTOR = ".//img[@itemprop='image']"
         DESCRIPTION_SELECTOR = ".//span[contains(@class, 'product-listing__paragraph') and contains(@class, 'x-truncate-revealer-initialized')]"
-        PAGINATION_NEXT_SELECTOR = "//a[@rel='next'] | //a[contains(@class, 'pagination__item') and contains(text(), 'Next')]"
 
         self.init_driver(headless=False)
         try:
@@ -228,9 +227,8 @@ class G2Spider(BaseSpider):
                     self.log.info(
                         f"Scraped product data:\n{json.dumps(listing_data, indent=2)}")
 
-            # Handle pagination
-            next_request = self.handle_pagination(
-                response, category_name, PAGINATION_NEXT_SELECTOR)
+            # Handle pagination using URL-based approach
+            next_request = self.handle_pagination(response, category_name)
             if next_request:
                 yield next_request
 
@@ -363,8 +361,8 @@ class G2Spider(BaseSpider):
             self.log.warning(f"Error extracting description: {str(e)}")
             return ""
 
-    def handle_pagination(self, response, category_name, pagination_selector):
-        """Handle pagination logic for G2 based on configuration"""
+    def handle_pagination(self, response, category_name):
+        # Handle pagination logic for G2 using URL-based approach with ?page= parameter
         current_page = response.meta.get('page_num', 1)
 
         should_continue = False
@@ -376,18 +374,21 @@ class G2Spider(BaseSpider):
             limit_info = f"max {self.MAX_PAGES} pages"
 
         if should_continue:
-            next_page_elements = self.find_elements_safe(
-                "xpath", pagination_selector)
-            if next_page_elements:
-                next_page_element = next_page_elements[0]
-                next_page_url = next_page_element.get_attribute("href")
-                next_page_url = urljoin(response.url, next_page_url)
-                next_page_num = current_page + 1
+            # Construct next page URL by appending ?page= parameter
+            # Remove existing query params
+            base_url = response.url.split('?')[0]
+            next_page_num = current_page + 1
+            next_page_url = f"{base_url}?page={next_page_num}"
 
-                self.log.info(
-                    f"Scraping next page ({next_page_num}) for category '{category_name}': {next_page_url}"
-                )
-                return Request(next_page_url, callback=self.parse_category, meta={'page_num': next_page_num})
+            self.log.info(
+                f"Scraping next page ({next_page_num}) for category '{category_name}': {next_page_url}"
+            )
+            return Request(
+                next_page_url,
+                callback=self.parse_category,
+                meta={'page_num': next_page_num,
+                      'category_name': category_name}
+            )
 
         self.log.success(
             f"Finished scraping category '{category_name}'. Reached limit ({limit_info})."
