@@ -8,14 +8,6 @@ import json
 
 
 class G2Spider(BaseSpider):
-    """
-    G2 Spider that follows this workflow:
-    1. Start from main categories page: /categories
-    2. Randomly sample SAMPLE_CATEGORY_COUNT categories
-    3. For each category: detect if it has subcategories or direct products
-    4. If subcategories: follow each subcategory link and scrape products
-    5. If direct products: scrape products immediately with pagination
-    """
     name = "g2"
     start_urls = [
         "https://www.g2.com/categories"  # Main categories page
@@ -47,16 +39,10 @@ class G2Spider(BaseSpider):
     PRODUCT_CARD_SELECTOR = "//div[@class='segmented-shadow-card__segment segmented-shadow-card__segment--multi-part'] | //div[@class='product-card']"
 
     async def start(self):
-        """
-        Starts the requests to the hardcoded category pages.
-        """
         for url in self.start_urls:
             yield Request(url, callback=self.parse)
 
     def parse(self, response):
-        """
-        Parses a category page and determines if it has subcategories or direct products.
-        """
         self.log.info(f"Parsing G2 category page: {response.url}")
 
         # Initialize browser driver for JS rendering
@@ -86,10 +72,7 @@ class G2Spider(BaseSpider):
             self.log.error(f"Error in parse method: {str(e)}")
 
     def detect_page_type(self):
-        """
-        Detect if the current page has subcategories or direct product listings.
-        Simplified boolean approach: if not direct products, treat as subcategories.
-        """
+        # Detect if the current page has subcategories or direct product listings.
         # Wait for page content to load
         time.sleep(2)
 
@@ -107,9 +90,7 @@ class G2Spider(BaseSpider):
         return "subcategories"
 
     def handle_main_categories_page(self, response):
-        """
-        Handle the main categories page by extracting and randomly sampling category links.
-        """
+        # Handle the main categories page by extracting and randomly sampling category links.
         self.log.info("Handling main categories page")
 
         # Try multiple selectors to find category links
@@ -207,9 +188,7 @@ class G2Spider(BaseSpider):
             f"Successfully queued {processed_count} category requests")
 
     def handle_subcategories_page(self, response):
-        """
-        Handle a page that contains subcategories.
-        """
+        # Handle a page that contains subcategories.
         self.log.info("Handling subcategories page")
 
         # Use the driver that's already initialized in parse method
@@ -256,9 +235,7 @@ class G2Spider(BaseSpider):
             f"Successfully queued {processed_count} subcategory requests")
 
     def handle_direct_products_page(self, response):
-        """
-        Handle a page that contains direct product listings.
-        """
+        # Handle a page that contains direct product listings.
         self.log.info("Handling direct products page")
 
         # Extract category info from URL
@@ -272,9 +249,7 @@ class G2Spider(BaseSpider):
         )
 
     def parse_category(self, response):
-        """
-        Parses a category page to extract software listings.
-        """
+        # Parses a category page to extract software listings.
         # selectors based on consistent G2 class patterns
         PRODUCT_CARD_SELECTOR = "//div[contains(@class, 'segmented-shadow-card__segment')]"
 
@@ -306,19 +281,6 @@ class G2Spider(BaseSpider):
             if not product_cards:
                 self.log.warning(
                     f"No product listings found on {response.url}")
-                self.log.info("Trying alternative selectors for debugging...")
-                alt_cards1 = self.find_elements_safe(
-                    "xpath", "//div[contains(@class, 'product-card')]")
-                alt_cards2 = self.find_elements_safe(
-                    "xpath", "//div[contains(@class, 'segmented-shadow-card')]")
-                alt_cards3 = self.find_elements_safe(
-                    "xpath", "//div[@itemprop='name']")
-                self.log.info(
-                    f"Alt selector 1 (product-card): {len(alt_cards1)} elements")
-                self.log.info(
-                    f"Alt selector 2 (segmented-shadow-card): {len(alt_cards2)} elements")
-                self.log.info(
-                    f"Alt selector 3 (itemprop=name): {len(alt_cards3)} elements")
                 return
 
             self.log.success(
@@ -341,7 +303,7 @@ class G2Spider(BaseSpider):
             self.log.error(f"Error in parse_category method: {str(e)}")
 
     def extract_category_info(self, url):
-        """Extract category slug and name from URL"""
+        # Extract category slug and name from URL
         path = urlparse(url).path
         # Assuming URL structure like /categories/crm
         category_slug = path.strip("/").split("/")[-1]
@@ -352,7 +314,7 @@ class G2Spider(BaseSpider):
 
     def extract_product_data(self, card, category_slug, category_name, base_url,
                              name_selector, link_selector, logo_selector, description_selector):
-        """Extract core product data from a single product card"""
+        # Extract core product data from a single product card
 
         try:
             # Extract product name
@@ -394,7 +356,7 @@ class G2Spider(BaseSpider):
             return None
 
     def extract_full_description(self, card, description_selector):
-        """Extract complete product description using two-part structure"""
+        # Extract complete product description using two-part structure
         try:
             # Find description specifically within this card's scope
             desc_element = None
