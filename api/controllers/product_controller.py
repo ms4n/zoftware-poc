@@ -6,7 +6,7 @@ from loguru import logger
 from database import RawProduct, CleanProduct, Review as ReviewModel
 from services.product_service import ProductService
 from services.ai_service import AIService
-from schemas.product import RawProduct as RawProductModel, CleanProduct as CleanProductModel, Review, ProductResponse, ReviewStatus
+from schemas.product import RawProduct as RawProductModel, CleanProduct as CleanProductModel, Review, ProductResponse, ReviewStatus, ReviewAction
 
 
 class ProductController:
@@ -62,15 +62,10 @@ class ProductController:
                 )
 
             # Update status based on review action
-            if review.action == "approve":
+            if review.action == ReviewAction.APPROVE:
                 clean_product.status = ReviewStatus.APPROVED
-            elif review.action == "reject":
+            elif review.action == ReviewAction.REJECT:
                 clean_product.status = ReviewStatus.REJECTED
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid action. Must be 'approve' or 'reject'"
-                )
 
             # Save review
             db_review = ReviewModel(

@@ -144,7 +144,7 @@ class ProductService:
                 response = ProductResponse(
                     id=raw_product.id,
                     name=raw_product.name,
-                    description=raw_product.description,
+                    description=clean_product.description if clean_product else raw_product.description,
                     website=raw_product.website,
                     logo=raw_product.logo,
                     category=clean_product.category if clean_product else None,

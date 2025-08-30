@@ -34,3 +34,5 @@ scraper/utils/proxy_extensions/
 .env
 
 zoftware.db
+
+logs

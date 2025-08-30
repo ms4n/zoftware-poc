@@ -17,6 +17,11 @@ class ReviewStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class ReviewAction(str, Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
 class ProductCategory(str, Enum):
     SALES_MARKETING = "sales_marketing"
     DEVTOOLS = "devtools"
@@ -43,7 +48,7 @@ class CleanProduct(BaseModel):
 
 class Review(BaseModel):
     clean_product_id: int
-    action: str  # "approve" or "reject"
+    action: ReviewAction  # "approve" or "reject"
     reason: Optional[str] = None
 
 

@@ -103,6 +103,54 @@ def get_products(
         )
 
 
+@router.get("/pending")
+def get_pending_products(
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    Get products pending approval for admin review
+    """
+    try:
+        product_controller = ProductController(db)
+        return product_controller.get_products(
+            status_filter="pending",
+            limit=limit,
+            offset=offset
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get pending products: {str(e)}"
+        )
+
+
+@router.get("/approved")
+def get_approved_products(
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    Get only approved products for end user display
+    """
+    try:
+        product_controller = ProductController(db)
+        return product_controller.get_products(
+            status_filter="approved",
+            limit=limit,
+            offset=offset
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get approved products: {str(e)}"
+        )
+
+
 @router.post("/review/{clean_product_id}")
 def review_product(
     clean_product_id: int,

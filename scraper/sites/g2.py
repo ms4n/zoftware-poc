@@ -10,7 +10,7 @@ import json
 class G2Spider(BaseSpider):
     name = "g2"
     start_urls = [
-        "https://www.g2.com/categories/threat-intelligence"  # Main categories page
+        "https://www.g2.com/categories/influencer-marketing-platforms"  # Main categories page
     ]
     handle_httpstatus_list = [403, 404]
 
