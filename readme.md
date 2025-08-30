@@ -24,7 +24,14 @@ A web scraping and product management platform with FastAPI backend, React front
    pip install -r requirements.txt
    ```
 
-3. **Run the API:**
+3. **Configure environment:**
+
+   ```bash
+   cd api
+   echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
+   ```
+
+4. **Run the API:**
    ```bash
    cd api
    uvicorn main:app --reload
