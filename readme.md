@@ -75,6 +75,8 @@ The client will be available at `http://localhost:5173`
    10.0.0.50,3128,proxy_user,proxy_pass
    ```
 
+   > **Note**: For free proxies, try [Webshare.io](https://www.webshare.io/) - they provide 10 free proxies that work well.
+
 4. **Run scrapers from project root:**
 
    **G2 Scraper:**
