@@ -7,4 +7,5 @@ export { ProductGrid } from "./ProductGrid";
 export { FloatingBottomNav } from "./FloatingBottomNav";
 export { PendingProducts } from "./PendingProducts";
 export { ApprovedProducts } from "./ApprovedProducts";
+export { ProductCount } from "./ProductCount";
 export type { Product } from "./types";

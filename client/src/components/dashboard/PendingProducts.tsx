@@ -4,6 +4,7 @@ import {
   ErrorState,
   EmptyState,
   ProductGrid,
+  ProductCount,
   type Product,
 } from "./index";
 
@@ -32,6 +33,11 @@ export function PendingProducts() {
     }
   };
 
+  const handleStatusChange = (productId: number, newStatus: string) => {
+    // Remove the product from the pending list when it's approved or rejected
+    setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
+  };
+
   if (loading) {
     return <LoadingState />;
   }
@@ -43,10 +49,15 @@ export function PendingProducts() {
   return (
     <div className="min-h-screen bg-gray-50 pt-8 pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <ProductCount count={products.length} type="pending" />
         {products.length === 0 ? (
           <EmptyState type="pending" />
         ) : (
-          <ProductGrid products={products} />
+          <ProductGrid 
+            products={products} 
+            onStatusChange={handleStatusChange}
+            isPending={true}
+          />
         )}
       </div>
     </div>

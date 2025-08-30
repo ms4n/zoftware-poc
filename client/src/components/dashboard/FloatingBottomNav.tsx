@@ -9,7 +9,11 @@ export function FloatingBottomNav({
 }: FloatingBottomNavProps) {
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="bg-white rounded-full shadow-lg border border-gray-200 px-2 py-2">
+      {/* Backdrop blur layer */}
+      <div className="absolute inset-0 -m-4 bg-white/80 backdrop-blur-md rounded-full"></div>
+
+      {/* Navigation container */}
+      <div className="relative bg-white/90 rounded-full shadow-lg border border-gray-200 px-2 py-2">
         <div className="flex space-x-1">
           <button
             onClick={() => onTabChange("approved")}

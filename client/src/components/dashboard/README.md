@@ -14,6 +14,15 @@ A reusable card component that displays individual product information including
 - Website link icon button next to product name
 - Action buttons (Approve, Reject)
 
+### `ProductCount`
+
+A minimal count display component that shows:
+
+- Large, bold number count
+- Descriptive label (e.g., "Approved Products", "Pending Products")
+- Centered above the product grid
+- Clean, aesthetic design
+
 ### `FloatingBottomNav`
 
 A floating bottom navigation bar with tabs:
@@ -29,6 +38,7 @@ Component for displaying pending products:
 
 - Fetches from `/products/pending` endpoint
 - Shows loading, error, and empty states
+- Product count display above grid
 - Responsive grid layout
 - Bottom padding for floating navigation
 
@@ -38,6 +48,7 @@ Component for displaying approved products:
 
 - Fetches from `/products/approved` endpoint
 - Shows loading, error, and empty states
+- Product count display above grid
 - Responsive grid layout
 - Bottom padding for floating navigation
 
@@ -71,6 +82,7 @@ The main App component now uses:
 - **Root (`/`)**: Shows approved products by default
 - **Tab Navigation**: Floating bottom bar to switch between approved/pending
 - **No Header**: Clean, minimal design without top navigation
+- **Product Counts**: Minimal count display above each product grid
 - **Responsive Layout**: Proper spacing for floating navigation
 
 ## Usage
@@ -78,6 +90,7 @@ The main App component now uses:
 ```tsx
 import {
   ProductCard,
+  ProductCount,
   FloatingBottomNav,
   PendingProducts,
   ApprovedProducts,
@@ -86,6 +99,7 @@ import {
 
 // Use in your app
 <FloatingBottomNav activeTab="approved" onTabChange={setActiveTab} />
+<ProductCount count={5} type="approved" />
 <PendingProducts />
 <ApprovedProducts />
 ```
@@ -96,14 +110,19 @@ import {
 
 - `product: Product` - Product data object
 
+### ProductCount
+
+- `count: number` - Number of products to display
+- `type: "approved" | "pending"` - Type of products for labeling
+
 ### FloatingBottomNav
 
-- `activeTab: 'approved' | 'pending'` - Currently active tab
-- `onTabChange: (tab: 'approved' | 'pending') => void` - Tab change handler
+- `activeTab: "approved" | "pending"` - Currently active tab
+- `onTabChange: (tab: "approved" | "pending") => void` - Tab change handler
 
 ### EmptyState
 
-- `type: 'approved' | 'pending'` - Type of empty state to display
+- `type: "approved" | "pending"` - Type of empty state to display
 
 ## Types
 
@@ -129,3 +148,10 @@ All components use Tailwind CSS classes and are fully responsive. The floating n
 - Rounded corners and shadows
 - Smooth transitions
 - Proper z-index for layering
+
+The ProductCount component features:
+
+- Large, bold typography for the number
+- Subtle gray text for the label
+- Centered alignment above the product grid
+- Minimal spacing and clean aesthetics
