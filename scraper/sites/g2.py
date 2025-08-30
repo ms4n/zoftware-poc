@@ -22,7 +22,7 @@ class G2Spider(BaseSpider):
     # Maximum number of pages to scrape per category (when SCRAPE_ALL_PAGES=False)
     MAX_PAGES = 1
 
-    USE_ROTATING_PROXIES = True  # Enable/disable rotating proxies
+    USE_ROTATING_PROXIES = False  # Enable/disable rotating proxies
 
     # G2-specific selectors for JS-rendered content (updated for new UI)
     CATEGORIES_TABLE_SELECTOR = "//div[contains(@class, 'categories__table')]"

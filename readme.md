@@ -1,57 +1,106 @@
-# Zoftware POC - Capterra Scraper
+# Zoftware POC
 
-## Challenge: Bypassing Sophisticated Anti-Bot Protection
+A web scraping and product management platform with FastAPI backend, React frontend, and Scrapy-based scrapers.
 
-### Blocker #1: Cloudflare Enterprise Protection
+## Index
 
-**Problem**: Capterra uses advanced Cloudflare protection that blocked all automation attempts
+- [API Setup](#api-setup)
+- [Dashboard Client Setup](#dashboard-client-setup)
+- [Scraper Setup](#scraper-setup)
+- [Known Blockers](#known-blockers)
 
-- Simple `curl` requests → "Attention Required! | Cloudflare"
-- Playwright + stealth techniques → 403 Forbidden
-- Rotating proxies + user-agents → Still blocked
-- Even browser-like headers failed
+## API Setup
 
-**Evidence**: `curl -H "User-Agent: Mozilla/..." https://www.capterra.in/directory` returned Cloudflare block page
+1. **Create and activate virtual environment:**
 
-**Root Cause**: Sophisticated detection beyond User-Agent checks:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-- TLS fingerprinting
-- JavaScript challenges requiring execution
-- Browser behavior pattern analysis
-- Missing "human" browser characteristics
+2. **Install dependencies:**
 
-### Blocker #2: Framework Architecture Conflicts
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-**Problem**: Mixed async/sync code and incorrect status checking
+3. **Run the API:**
+   ```bash
+   cd api
+   uvicorn main:app --reload
+   ```
 
-- Scrapy's HTTP response showed 403, but `undetected-chromedriver` navigation was actually working
-- Base spider had async methods conflicting with synchronous approach
+The API will be available at `http://localhost:8000`
 
-### Solution: `undetected-chromedriver`
+## Dashboard Client Setup
 
-**Breakthrough**: Replaced Playwright with `undetected-chromedriver`
+1. **Install dependencies:**
 
-- **Result**: Complete Cloudflare bypass ✅
-- Successfully scraped 50+ products across 2 pages
-- Perfect data extraction: names, links, logos, categories, pagination
+   ```bash
+   cd client
+   npm install
+   ```
 
-**Key Insight**: Enterprise anti-bot protection requires tools specifically designed for evasion, not just stealth layers on standard automation.
+2. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
 
-### Blocker #3: Headless Mode Detection
+The client will be available at `http://localhost:5173`
 
-**Problem**: Cloudflare applies stricter detection for headless browsers
+## Scraper Setup
 
-- **Headful mode** (visible browser): ✅ Complete bypass
-- **Headless mode**: ❌ "Attention Required! | Cloudflare"
+1. **Create and activate virtual environment:**
 
-**Solution**: Production deployment requires headful mode for Capterra
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-## Final Success Metrics
+2. **Install dependencies:**
 
-- ✅ 999 categories discovered
-- ✅ Random sampling working
-- ✅ 50 products scraped from "Speech Analytics" category
-- ✅ Pagination across multiple pages
-- ✅ Complete data extraction pipeline
-- ✅ Confirmed headful mode requirement for production
-- ✅ Configurable proxy support for scale
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+   > **Note**: If you already installed packages in the API setup step, no need to install again.
+
+3. **Configure proxies (optional):**
+
+   If using rotating proxies, create `scraper/proxies_formatted.csv` with format:
+
+   ```csv
+   ip_address,port,username,password
+   192.168.1.100,8080,user123,pass456
+   10.0.0.50,3128,proxy_user,proxy_pass
+   ```
+
+4. **Run scrapers from project root:**
+
+   **G2 Scraper:**
+
+   ```bash
+   python -m scraper.engine.main g2
+   ```
+
+   **Capterra Scraper:**
+
+   ```bash
+   python -m scraper.engine.main capterra
+   ```
+
+## Known Blockers
+
+### Cloudflare Enterprise Protection
+
+**Problem**: Capterra uses advanced Cloudflare protection that blocks automation attempts.
+
+**Evidence**: Simple requests return "Attention Required! | Cloudflare" page.
+
+**Solution**: Use `undetected-chromedriver` instead of Playwright for complete bypass.
+
+### Headless Mode Detection
+
+**Problem**: Cloudflare applies stricter detection for headless browsers.
+
+**Solution**: Use headful mode (visible browser) for successful scraping.
